@@ -129,6 +129,12 @@ button{
 
     <h2>給油履歴</h2>
 
+    <!-- ★ 追加：平均表示エリア -->
+    <div style="text-align:right; margin-bottom:10px;">
+      <span id="avgFuelEconomy"></span><br>
+      <span id="avgUnitPrice"></span>
+    </div>
+
     <div id="records"></div>
 
   </div>
@@ -176,11 +182,9 @@ function saveRecord(){
 }
 
 function sortRecords(){
-
   records.sort((a,b)=>{
     return new Date(a.date) - new Date(b.date);
   });
-
 }
 
 function calculateFuelEconomy(index){
@@ -194,12 +198,10 @@ function calculateFuelEconomy(index){
   let prev = null;
 
   for(let i=index-1;i>=0;i--){
-
     if(records[i].full){
       prev = records[i];
       break;
     }
-
   }
 
   if(!prev){
@@ -211,9 +213,7 @@ function calculateFuelEconomy(index){
   let totalLiters = 0;
 
   for(let i=index;i>records.indexOf(prev);i--){
-
     totalLiters += records[i].liters;
-
   }
 
   if(totalLiters <= 0){
@@ -289,15 +289,15 @@ function renderRecords(){
   });
 
   if(records.length > visibleCount){
-
     area.innerHTML += `
       <button class="saveBtn" onclick="loadMore()">
         もっと見る
       </button>
     `;
-
   }
 
+  // ★ 追加：平均値更新
+  updateAverages();
 }
 
 function editRecord(index){
@@ -344,11 +344,38 @@ function clearForm(){
 }
 
 function loadMore(){
-
   visibleCount += 15;
-
   renderRecords();
+}
 
+function updateAverages() {
+
+  if (records.length === 0) {
+    document.getElementById('avgFuelEconomy').textContent = '';
+    document.getElementById('avgUnitPrice').textContent = '';
+    return;
+  }
+
+  // 平均燃費（満タン計算できるデータのみ）
+  let fuelEconomies = [];
+  for (let i = 0; i < records.length; i++) {
+    const fe = calculateFuelEconomy(i);
+    if (fe !== '-' && !isNaN(fe)) {
+      fuelEconomies.push(Number(fe));
+    }
+  }
+
+  const avgFuel = fuelEconomies.length > 0
+    ? (fuelEconomies.reduce((a,b)=>a+b,0) / fuelEconomies.length).toFixed(1)
+    : '-';
+
+  // 平均1L単価
+  const avgUnit = (
+    records.reduce((sum, r) => sum + (r.price / r.liters), 0) / records.length
+  ).toFixed(1);
+
+  document.getElementById('avgFuelEconomy').textContent = `平均燃費: ${avgFuel} km/L`;
+  document.getElementById('avgUnitPrice').textContent = `平均1L単価: ${avgUnit} 円`;
 }
 
 </script>
