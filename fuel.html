@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>燃費メモ</title>
+
+<style>
+
+body{
+  font-family:sans-serif;
+  background:#f3f3f3;
+  margin:0;
+  padding:20px;
+}
+
+.container{
+  max-width:600px;
+  margin:auto;
+}
+
+.card{
+  background:white;
+  border-radius:20px;
+  padding:20px;
+  margin-bottom:20px;
+  box-shadow:0 2px 10px rgba(0,0,0,0.08);
+}
+
+h1{
+  margin-top:0;
+}
+
+input{
+  width:100%;
+  padding:12px;
+  margin-top:5px;
+  margin-bottom:15px;
+  border-radius:12px;
+  border:1px solid #ccc;
+  box-sizing:border-box;
+}
+
+button{
+  border:none;
+  border-radius:12px;
+  padding:10px 16px;
+  color:white;
+  cursor:pointer;
+}
+
+.saveBtn{
+  background:#10b981;
+  width:100%;
+  font-size:16px;
+}
+
+.editBtn{
+  background:#3b82f6;
+}
+
+.deleteBtn{
+  background:#ef4444;
+}
+
+.record{
+  border:1px solid #ddd;
+  border-radius:16px;
+  padding:15px;
+  margin-bottom:15px;
+  background:#fafafa;
+}
+
+.small{
+  color:#666;
+  margin-top:4px;
+}
+
+.green{
+  color:#10b981;
+  font-weight:bold;
+  margin-top:8px;
+}
+
+.check{
+  margin-bottom:15px;
+}
+
+.check input{
+  width:auto;
+}
+
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+  <div class="card">
+
+    <h1>🚐 燃費メモ</h1>
+
+    <label>給油日</label>
+    <input type="date" id="date">
+
+    <label>総走行距離 (km)</label>
+    <input type="number" id="km">
+
+    <label>給油量 (L)</label>
+    <input type="number" step="0.01" id="liters">
+
+    <label>金額 (円)</label>
+    <input type="number" id="price">
+
+    <div class="check">
+      <input type="checkbox" id="full" checked>
+      <label for="full">満タン給油</label>
+    </div>
+
+    <button class="saveBtn" onclick="saveRecord()">
+      記録する
+    </button>
+
+  </div>
+
+  <div class="card">
+
+    <h2>給油履歴</h2>
+
+    <div id="records"></div>
+
+  </div>
+
+</div>
+
+<script>
+
+let records = JSON.parse(localStorage.getItem('fuelRecords')) || [];
+let editIndex = null;
+let visibleCount = 15;
+
+renderRecords();
+
+function saveRecord(){
+
+  const data = {
+    date: document.getElementById('date').value,
+    km: Number(document.getElementById('km').value),
+    liters: Number(document.getElementById('liters').value),
+    price: Number(document.getElementById('price').value),
+    full: document.getElementById('full').checked
+  };
+
+  if(!data.date || !data.km || !data.liters || !data.price){
+    alert('全部入力してください');
+    return;
+  }
+
+  if(editIndex !== null){
+    records[editIndex] = data;
+    editIndex = null;
+  }else{
+    records.push(data);
+  }
+
+  sortRecords();
+
+  localStorage.setItem('fuelRecords', JSON.stringify(records));
+
+  clearForm();
+
+  renderRecords();
+
+}
+
+function sortRecords(){
+
+  records.sort((a,b)=>{
+    return new Date(a.date) - new Date(b.date);
+  });
+
+}
+
+function calculateFuelEconomy(index){
+
+  const current = records[index];
+
+  if(!current.full){
+    return '-';
+  }
+
+  let prev = null;
+
+  for(let i=index-1;i>=0;i--){
+
+    if(records[i].full){
+      prev = records[i];
+      break;
+    }
+
+  }
+
+  if(!prev){
+    return '-';
+  }
+
+  const distance = current.km - prev.km;
+
+  let totalLiters = 0;
+
+  for(let i=index;i>records.indexOf(prev);i--){
+
+    totalLiters += records[i].liters;
+
+  }
+
+  if(totalLiters <= 0){
+    return '-';
+  }
+
+  return (distance / totalLiters).toFixed(1);
+
+}
+
+function renderRecords(){
+
+  const area = document.getElementById('records');
+
+  area.innerHTML = '';
+
+  records
+  .slice()
+  .reverse()
+  .slice(0, visibleCount)
+  .forEach((r, displayIndex)=>{
+
+    const index = records.length - 1 - displayIndex;
+
+    const fuelEconomy = calculateFuelEconomy(index);
+
+    const unitPrice = (r.price / r.liters).toFixed(1);
+
+    const div = document.createElement('div');
+
+    div.className = 'record';
+
+    div.innerHTML = `
+      <b>${r.date}</b>
+
+      <div class="small">
+        走行距離: ${r.km} km
+      </div>
+
+      <div class="small">
+        給油量: ${r.liters} L
+      </div>
+
+      <div class="small">
+        金額: ${r.price} 円
+      </div>
+
+      <div class="small">
+        1L単価: ${unitPrice} 円
+      </div>
+
+      <div class="small">
+        満タン: ${r.full ? '○' : '部分給油'}
+      </div>
+
+      <div class="green">
+        燃費: ${fuelEconomy} km/L
+      </div>
+
+      <br>
+
+      <button class="editBtn" onclick="editRecord(${index})">
+        編集
+      </button>
+
+      <button class="deleteBtn" onclick="deleteRecord(${index})">
+        削除
+      </button>
+    `;
+
+    area.appendChild(div);
+
+  });
+
+  if(records.length > visibleCount){
+
+    area.innerHTML += `
+      <button class="saveBtn" onclick="loadMore()">
+        もっと見る
+      </button>
+    `;
+
+  }
+
+}
+
+function editRecord(index){
+
+  const r = records[index];
+
+  document.getElementById('date').value = r.date;
+  document.getElementById('km').value = r.km;
+  document.getElementById('liters').value = r.liters;
+  document.getElementById('price').value = r.price;
+  document.getElementById('full').checked = r.full;
+
+  editIndex = index;
+
+  window.scrollTo({
+    top:0,
+    behavior:'smooth'
+  });
+
+}
+
+function deleteRecord(index){
+
+  if(confirm('削除しますか？')){
+
+    records.splice(index,1);
+
+    localStorage.setItem('fuelRecords', JSON.stringify(records));
+
+    renderRecords();
+
+  }
+
+}
+
+function clearForm(){
+
+  document.getElementById('date').value = '';
+  document.getElementById('km').value = '';
+  document.getElementById('liters').value = '';
+  document.getElementById('price').value = '';
+  document.getElementById('full').checked = true;
+
+}
+
+function loadMore(){
+
+  visibleCount += 15;
+
+  renderRecords();
+
+}
+
+</script>
+
+</body>
+</html>
